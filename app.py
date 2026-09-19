@@ -1,17 +1,8 @@
 
 import streamlit as st
 import pandas as pd
-import numpy as np
 import pickle
 import matplotlib.pyplot as plt
-
-from sklearn.metrics import (
-    confusion_matrix,
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score
-)
 
 # =========================================================
 # PAGE CONFIGURATION
@@ -24,7 +15,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# LOAD MODEL AND SCALER
+# LOAD MODEL, SCALER AND METADATA
 # =========================================================
 
 with open("diabetes_model.pkl", "rb") as file:
@@ -33,12 +24,12 @@ with open("diabetes_model.pkl", "rb") as file:
 with open("scaler.pkl", "rb") as file:
     scaler = pickle.load(file)
 
-# Load dataset
-diabetes_dataset = pd.read_csv("diabetes.csv")
+with open("model_metadata.pkl", "rb") as file:
+    metadata = pickle.load(file)
 
-# Separate features and target
-X = diabetes_dataset.drop(columns="Outcome")
-Y = diabetes_dataset["Outcome"]
+dataset_averages = metadata["dataset_averages"]
+cm = metadata["confusion_matrix"]
+metrics = metadata["metrics"]
 
 # =========================================================
 # CUSTOM CSS
@@ -156,10 +147,6 @@ predict_button = st.sidebar.button(
 
 if predict_button:
 
-    # =====================================================
-    # CREATE INPUT DATA
-    # =====================================================
-
     input_data = pd.DataFrame(
         [[
             pregnancies,
@@ -171,32 +158,31 @@ if predict_button:
             diabetes_pedigree,
             age
         ]],
-        columns=X.columns
+        columns=[
+            "Pregnancies",
+            "Glucose",
+            "BloodPressure",
+            "SkinThickness",
+            "Insulin",
+            "BMI",
+            "DiabetesPedigreeFunction",
+            "Age"
+        ]
     )
 
-    # =====================================================
-    # STANDARDIZE INPUT
-    # =====================================================
-
+    # Standardize
     std_data = scaler.transform(input_data)
 
-    # =====================================================
-    # PREDICTION
-    # =====================================================
-
+    # Prediction
     prediction = classifier.predict(std_data)
 
-    # =====================================================
-    # PROBABILITY
-    # =====================================================
-
+    # Probability
     probability = classifier.predict_proba(std_data)
 
-    # Probability of class 1
     risk_percentage = probability[0][1] * 100
 
     # =====================================================
-    # PREDICTION RESULT
+    # RESULT
     # =====================================================
 
     st.divider()
@@ -289,14 +275,14 @@ if predict_button:
         ],
 
         "Dataset Average": [
-            X["Pregnancies"].mean(),
-            X["Glucose"].mean(),
-            X["BloodPressure"].mean(),
-            X["SkinThickness"].mean(),
-            X["Insulin"].mean(),
-            X["BMI"].mean(),
-            X["DiabetesPedigreeFunction"].mean(),
-            X["Age"].mean()
+            dataset_averages["Pregnancies"],
+            dataset_averages["Glucose"],
+            dataset_averages["BloodPressure"],
+            dataset_averages["SkinThickness"],
+            dataset_averages["Insulin"],
+            dataset_averages["BMI"],
+            dataset_averages["DiabetesPedigreeFunction"],
+            dataset_averages["Age"]
         ]
     })
 
@@ -328,19 +314,7 @@ if predict_button:
 
     st.subheader("🔲 Confusion Matrix")
 
-    X_scaled = scaler.transform(X)
-
-    all_predictions = classifier.predict(X_scaled)
-
-    cm = confusion_matrix(
-        Y,
-        all_predictions
-    )
-
-    # Smaller figure
-    fig, ax = plt.subplots(
-        figsize=(4, 3)
-    )
+    fig, ax = plt.subplots(figsize=(4, 3))
 
     ax.imshow(cm)
 
@@ -372,7 +346,6 @@ if predict_button:
         fontsize=8
     )
 
-    # Display values inside matrix
     for i in range(2):
 
         for j in range(2):
@@ -399,61 +372,38 @@ if predict_button:
 
     st.subheader("📊 Model Performance")
 
-    accuracy = accuracy_score(
-        Y,
-        all_predictions
-    )
-
-    precision = precision_score(
-        Y,
-        all_predictions,
-        zero_division=0
-    )
-
-    recall = recall_score(
-        Y,
-        all_predictions,
-        zero_division=0
-    )
-
-    f1 = f1_score(
-        Y,
-        all_predictions,
-        zero_division=0
-    )
-
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
 
         st.metric(
             "Accuracy",
-            f"{accuracy * 100:.2f}%"
+            f"{metrics['accuracy'] * 100:.2f}%"
         )
 
     with col2:
 
         st.metric(
             "Precision",
-            f"{precision * 100:.2f}%"
+            f"{metrics['precision'] * 100:.2f}%"
         )
 
     with col3:
 
         st.metric(
             "Recall",
-            f"{recall * 100:.2f}%"
+            f"{metrics['recall'] * 100:.2f}%"
         )
 
     with col4:
 
         st.metric(
             "F1 Score",
-            f"{f1 * 100:.2f}%"
+            f"{metrics['f1'] * 100:.2f}%"
         )
 
 # =========================================================
-# FOOTER / DISCLAIMER
+# DISCLAIMER
 # =========================================================
 
 st.divider()
